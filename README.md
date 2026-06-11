@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # ITQA Group 08 – Test Automation Framework
 
 **Selenium + RestAssured + Cucumber BDD + Allure Report**
@@ -167,16 +166,4 @@ itqa-automation/
 | `@SalesUI` | Sales UI tests |
 | `@SalesAPI` | Sales API tests |
 | `@TC_CAT_UI_01` | Specific test case |
-=======
-# B21_AI_Group_08
 
-## 👥 Team Members
-
-- **215562B** – THENUJAN U  
-- **215509V** – ASARAK A  
-- **215544X** – PIRAPANCHAN R  
-- **215560R** – SHARHAAN MFM  
-
-## 📌 Description
-This repository contains the work and project files for **B21 AI Group 08**.
->>>>>>> 9ce6f455a9ce92d18c77a339aae842781ae39591
