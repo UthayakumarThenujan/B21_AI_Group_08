@@ -1,0 +1,15 @@
+com\itqa\steps\AuthAPISteps.class
+com\itqa\steps\CommonSteps.class
+com\itqa\steps\CategoryAPISteps.class
+com\itqa\steps\AuthUISteps.class
+com\itqa\hooks\Hooks.class
+com\itqa\runners\AuthTestRunner.class
+com\itqa\steps\SalesUISteps.class
+com\itqa\steps\SalesAPISteps.class
+com\itqa\runners\CategoryTestRunner.class
+com\itqa\steps\PlantAPISteps.class
+com\itqa\steps\PlantUISteps.class
+com\itqa\steps\CategoryUISteps.class
+com\itqa\runners\AllTestsRunner.class
+com\itqa\runners\SalesTestRunner.class
+com\itqa\runners\PlantTestRunner.class
