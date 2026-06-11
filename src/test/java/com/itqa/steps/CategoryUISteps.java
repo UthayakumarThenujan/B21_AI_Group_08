@@ -106,14 +106,19 @@ public class CategoryUISteps {
 
     @When("I click the {string} column header")
     public void iClickColumnHeader(String columnName) {
-        // Find the clickable th or link inside th
-        WebElement header = webWait().until(ExpectedConditions.elementToBeClickable(
-                By.xpath("//th[normalize-space(text())='" + columnName + "'] " +
-                         "| //th//a[contains(text(),'" + columnName + "')] " +
-                         "| //th//*[contains(text(),'" + columnName + "')] " +
-                         "| //th[contains(.,'" + columnName + "')]")));
+
+        By locator = By.xpath(
+            "//th[normalize-space(text())='" + columnName + "']" +
+            " | //th//*[contains(text(),'" + columnName + "')]"
+        );
+
+        WebElement header = webWait()
+                .until(ExpectedConditions.elementToBeClickable(locator));
+
         header.click();
-        try { Thread.sleep(600); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+        webWait().until(ExpectedConditions.visibilityOfElementLocated(
+                By.cssSelector("table tbody tr")));
     }
 
     @When("I click the {string} column header again")
@@ -121,29 +126,35 @@ public class CategoryUISteps {
         iClickColumnHeader(columnName);
     }
 
+    @Then("the categories should be sorted in descending order by ID")
+    public void categoriesSortedDescById() {
+        // System.out.println(getNumericColumnValues(0));
+        verifySortedNumericColumn(0, false);
+    }
+
     @Then("the categories should be sorted in ascending order by ID")
     public void categoriesSortedAscById() {
+        // System.out.println(getNumericColumnValues(0));
         verifySortedNumericColumn(0, true);
     }
 
-    @Then("the categories should be sorted in descending order by ID")
-    public void categoriesSortedDescById() {
-        verifySortedNumericColumn(0, false);
-    }
+
 
     /**
      * TC_CAT_UI_03: Manual check confirmed Name sorting works.
      * Verify at least the first pair of rows is in ascending order.
      */
+    @Then("the categories should be sorted alphabetically Z to A")
+    public void categoriesSortedZToA() {
+        verifySortedStringColumn(1, false);
+    }
+
+
     @Then("the categories should be sorted alphabetically A to Z")
     public void categoriesSortedAToZ() {
         verifySortedStringColumn(1, true);
     }
 
-    @Then("the categories should be sorted alphabetically Z to A")
-    public void categoriesSortedZToA() {
-        verifySortedStringColumn(1, false);
-    }
 
     @Then("the categories should be grouped and sorted by parent category")
     public void categoriesSortedByParent() {
@@ -151,26 +162,41 @@ public class CategoryUISteps {
     }
 
     private void verifySortedNumericColumn(int colIdx, boolean ascending) {
-        List<WebElement> rows = driver().findElements(By.cssSelector("table tbody tr"));
+
+        List<WebElement> rows = driver().findElements(
+                By.cssSelector("table tbody tr"));
+
         if (rows.size() < 2) {
             System.out.println("Less than 2 rows – cannot verify sort order");
             return;
         }
+
         List<Integer> values = rows.stream().map(r -> {
             try {
-                String text = r.findElements(By.tagName("td")).get(colIdx).getText().trim();
+                String text = r.findElements(By.tagName("td"))
+                        .get(colIdx)
+                        .getText()
+                        .trim();
+
                 return Integer.parseInt(text);
-            } catch (Exception e) { return 0; }
+
+            } catch (Exception e) {
+                return 0;
+            }
         }).toList();
+
+        System.out.println("Column " + colIdx + " values: " + values);
 
         for (int i = 0; i < values.size() - 1; i++) {
             if (ascending) {
-                assertTrue("Expected ascending sort at row " + i + ": "
-                        + values.get(i) + " <= " + values.get(i + 1),
+                assertTrue(
+                        "Expected ascending sort at row " + i + ": "
+                                + values.get(i) + " <= " + values.get(i + 1),
                         values.get(i) <= values.get(i + 1));
             } else {
-                assertTrue("Expected descending sort at row " + i + ": "
-                        + values.get(i) + " >= " + values.get(i + 1),
+                assertTrue(
+                        "Expected descending sort at row " + i + ": "
+                                + values.get(i) + " >= " + values.get(i + 1),
                         values.get(i) >= values.get(i + 1));
             }
         }

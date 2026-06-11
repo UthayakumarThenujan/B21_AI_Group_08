@@ -34,7 +34,8 @@ Feature: Category Management UI Tests
     Then the categories should be sorted in ascending order by ID
     When I click the "ID" column header again
     Then the categories should be sorted in descending order by ID
-
+    
+  
   # ------------------------------------------------------------------
   # TC_CAT_UI_03 – Category list is sortable by Name column
   # Manual check: clicking "Name" header sorts correctly – test passes
@@ -44,7 +45,10 @@ Feature: Category Management UI Tests
     Given I am logged in as Admin
     When I navigate to "/ui/categories"
     And I click the "Name" column header
+    Then the categories should be sorted alphabetically Z to A
+    When I click the "Name" column header again
     Then the categories should be sorted alphabetically A to Z
+    
 
   # ------------------------------------------------------------------
   # TC_CAT_UI_04 – Category list is sortable by Parent Category column
@@ -53,7 +57,7 @@ Feature: Category Management UI Tests
   Scenario: TC_CAT_UI_04 – Category list is sortable by Parent Category column
     Given I am logged in as Admin
     When I navigate to "/ui/categories"
-    And I click the "Parent Category" column header
+    And I click the "Parent" column header
     Then the categories should be grouped and sorted by parent category
 
   # ------------------------------------------------------------------

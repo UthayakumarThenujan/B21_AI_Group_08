@@ -23,6 +23,10 @@ public class CategoryAPISteps {
     public void iSendPostRequest(String path, String body) {
         String token = TestDataStore.getString("adminToken");
         String resolvedPath = resolvePlaceholders(path);
+        String timestamp = String.valueOf(System.currentTimeMillis());
+
+        body = body.replace("{timestamp}",
+            timestamp.substring(timestamp.length() - 4)); // last 4 digits
 
         if (token != null) {
             lastResponse = ApiUtils.givenWithToken(token)
@@ -79,6 +83,8 @@ public class CategoryAPISteps {
         TestDataStore.put("lastResponse", lastResponse);
         System.out.println("PUT " + resolvedPath + " → " + lastResponse.statusCode()
                 + " (token role: " + (userToken != null ? "USER" : "ADMIN") + ")");
+        System.out.println("Response Body:");
+        System.out.println(lastResponse.getBody().asPrettyString());
     }
 
     @When("I send a DELETE request to {string}")

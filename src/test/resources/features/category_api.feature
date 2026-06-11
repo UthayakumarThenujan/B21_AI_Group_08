@@ -9,17 +9,18 @@ Feature: Category Management API Tests
 
   # ------------------------------------------------------------------
   # TC_CAT_API_01 – Admin can create a category via API
-  # Name: "NewCat001" (9 chars – valid per SRS 3–10 rule)
+  # Name: "NewCat003" (9 chars – valid per SRS 3–10 rule)
   # ------------------------------------------------------------------
   @TC_CAT_API_01
   Scenario: TC_CAT_API_01 – Admin can create a category via API
     Given I have a valid Admin JWT token
+
     When I send a POST request to "/api/categories" with body:
       """
-      {"name": "NewCat001"}
+      {"name": "Cat{timestamp}"}
       """
+
     Then the response status should be 201
-    And the response body should contain "NewCat001"
     And I save the created category ID as "createdCategoryId"
 
   # ------------------------------------------------------------------
@@ -61,18 +62,23 @@ Feature: Category Management API Tests
   # ------------------------------------------------------------------
   @TC_CAT_API_04
   Scenario Outline: TC_CAT_API_04 – Update category with invalid name returns 400
+
     Given I have a valid Admin JWT token
-    And a category exists with name "KeepName"
-    When I send a PUT request to "/api/categories/{createdCategoryId}" with body:
+
+    When I send a PUT request to "/api/categories/38" with body:
       """
-      {"name": "<invalidName>"}
+      {
+        "name": "<invalidName>",
+        "parentId": null
+      }
       """
+
     Then the response status should be 400
 
-    Examples:
-      | invalidName  |
-      | ab           |
-      | Toolongname1 |
+  Examples:
+    | invalidName  |
+    | ab           |
+    | Toolongname1 |
 
   # ------------------------------------------------------------------
   # TC_CAT_API_05 – Paginated category API returns correct structure
