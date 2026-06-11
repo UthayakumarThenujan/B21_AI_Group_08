@@ -146,9 +146,12 @@ public class CommonSteps {
 
     @When("I click the Logout button")
     public void iClickTheLogoutButton() {
+        // The Logout link in the sidebar: <a href="/ui/logout" class="nav-link text-danger">
+        // Using href selector — more reliable than text-based XPath when the element
+        // contains a child <i> icon before the text node.
         WebElement logoutBtn = webWait().until(
                 ExpectedConditions.elementToBeClickable(
-                        By.xpath("//a[contains(text(),'Logout')] | //button[contains(text(),'Logout')]")));
+                        By.cssSelector("a[href='/ui/logout']")));
         logoutBtn.click();
     }
 

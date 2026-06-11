@@ -21,7 +21,10 @@ public class CategoryAPISteps {
 
     @When("I send a POST request to {string} with body:")
     public void iSendPostRequest(String path, String body) {
-        String token = TestDataStore.getString("adminToken");
+        // Use userToken if set (user-role test), otherwise adminToken — same as GET/PUT/DELETE
+        String userToken  = TestDataStore.getString("userToken");
+        String adminToken = TestDataStore.getString("adminToken");
+        String token = userToken != null ? userToken : adminToken;
         String resolvedPath = resolvePlaceholders(path);
         String timestamp = String.valueOf(System.currentTimeMillis());
 
@@ -38,7 +41,8 @@ public class CategoryAPISteps {
                     .post(resolvedPath);
         }
         TestDataStore.put("lastResponse", lastResponse);
-        System.out.println("POST " + resolvedPath + " → " + lastResponse.statusCode());
+        System.out.println("POST " + resolvedPath + " → " + lastResponse.statusCode()
+                + " (token role: " + (userToken != null ? "USER" : "ADMIN") + ")");
     }
 
     @When("I send a GET request to {string}")
@@ -223,6 +227,16 @@ public class CategoryAPISteps {
                 .post("/api/plants/category/" + catId);
         if (plantResp.statusCode() == 201) {
             TestDataStore.put("createdPlantId", plantResp.jsonPath().getInt("id"));
+        } else {
+            // Plant name may already exist — fetch the first available plant from the list
+            Response listResp = ApiUtils.givenWithToken(adminToken).get("/api/plants");
+            if (listResp.statusCode() == 200) {
+                int existingId = listResp.jsonPath().getInt("[0].id");
+                TestDataStore.put("createdPlantId", existingId);
+                System.out.println("aPlantExistsInSystem: reused existing plant id=" + existingId);
+            } else {
+                throw new IllegalStateException("Could not create or find any plant in the system");
+            }
         }
     }
 
@@ -249,12 +263,28 @@ public class CategoryAPISteps {
     public void aSalesRecordExistsInSystem() {
         if (TestDataStore.getString("createdSalesId") != null) return;
         String adminToken = ApiUtils.getAdminToken();
+        // Ensure a plant exists first so we can create a sale against it
         aPlantExistsInSystem();
-        int plantId = TestDataStore.getInt("createdPlantId");
+        Object rawPlantId = TestDataStore.get("createdPlantId");
+        if (rawPlantId == null) {
+            throw new IllegalStateException("aPlantExistsInSystem did not store createdPlantId");
+        }
+        int plantId = ((Number) rawPlantId).intValue();
         Response resp = ApiUtils.givenWithToken(adminToken)
                 .post("/api/sales/plant/" + plantId + "?quantity=1");
         if (resp.statusCode() == 201) {
             TestDataStore.put("createdSalesId", resp.jsonPath().getInt("id"));
+            System.out.println("aSalesRecordExistsInSystem: created sales id=" + TestDataStore.getString("createdSalesId"));
+        } else {
+            // Sale creation failed — try to fetch an existing sale from the list
+            Response listResp = ApiUtils.givenWithToken(adminToken).get("/api/sales");
+            if (listResp.statusCode() == 200) {
+                int existingId = listResp.jsonPath().getInt("[0].id");
+                TestDataStore.put("createdSalesId", existingId);
+                System.out.println("aSalesRecordExistsInSystem: reused existing sales id=" + existingId);
+            } else {
+                throw new IllegalStateException("Could not create or find any sales record in the system");
+            }
         }
     }
 
