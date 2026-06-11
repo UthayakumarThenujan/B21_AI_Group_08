@@ -123,8 +123,9 @@ Feature: Authentication API Tests
   # ------------------------------------------------------------------
   @TC_SAL_API_07
   Scenario: TC_SAL_API_07 – Normal user cannot delete a sales record via API
-    Given I have a valid User JWT token
-    When I send a DELETE request to "/api/sales/1"
+    Given a sales record exists in the system
+    And I have a valid User JWT token
+    When I send a DELETE request to "/api/sales/{createdSalesId}"
     Then the response status should be 403
 
   # ------------------------------------------------------------------
@@ -132,8 +133,9 @@ Feature: Authentication API Tests
   # ------------------------------------------------------------------
   @TC_SAL_API_08
   Scenario: TC_SAL_API_08 – Normal user cannot create a sales record via API
-    Given I have a valid User JWT token
-    When I send a POST request to "/api/sales/plant/1?quantity=2" with body:
+    Given a plant exists in the system
+    And I have a valid User JWT token
+    When I send a POST request to "/api/sales/plant/{createdPlantId}?quantity=2" with body:
       """
       {}
       """
