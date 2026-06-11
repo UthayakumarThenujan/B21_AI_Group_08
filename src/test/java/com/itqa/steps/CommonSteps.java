@@ -157,7 +157,13 @@ public class CommonSteps {
 
     @When("I click the Save button")
     public void iClickTheSaveButton() {
-        driver().findElement(By.cssSelector("button[type='submit']")).click();
+        // IMPORTANT: The app renders <button class="btn btn-primary">Save</button> with NO type attribute.
+        // Selenium CSS selector button[type='submit'] requires the attribute to be explicitly written in HTML
+        // — it does NOT infer the default type. So we must match by class only.
+        // The Login button also uses btn-primary but has class 'w-100', so we exclude that.
+        WebElement saveBtn = webWait().until(ExpectedConditions.elementToBeClickable(
+                By.cssSelector("button.btn-primary:not([class*='w-100'])")));
+        saveBtn.click();
     }
 
     @When("I click the Cancel button")

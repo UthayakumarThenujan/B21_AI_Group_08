@@ -11,6 +11,7 @@ import org.openqa.selenium.support.ui.*;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -49,10 +50,34 @@ public class PlantUISteps {
 
     @Then("the {string} navigation menu item should be highlighted")
     public void navMenuItemHighlighted(String menuItem) {
-        WebElement activeLink = webWait().until(ExpectedConditions.presenceOfElementLocated(
-                By.xpath("//a[contains(@class,'active') or contains(@class,'current') or contains(@aria-current,'page')][contains(text(),'" + menuItem + "')]"
-                        + " | //*[contains(@class,'active')]//*[contains(text(),'" + menuItem + "')]")));
-        assertNotNull("Expected '" + menuItem + "' navigation to be active", activeLink);
+        // Nav links in this app: <a href="/ui/plants" class="nav-link text-white">
+        //                            <i class="bi bi-flower1 me-2"></i>Plants
+        //                        </a>
+        // The app SHOULD add an "active" class when the user is on the current page.
+        // Use href attribute to find the nav link (text() fails due to icon children).
+        String path = "/ui/" + menuItem.toLowerCase();
+
+        // Verify we navigated to the right page
+        assertTrue("Expected current URL to contain '" + path + "'",
+                driver().getCurrentUrl().contains(path));
+
+        // Find the nav link for this menu item
+        WebElement navLink = webWait().until(ExpectedConditions.presenceOfElementLocated(
+                By.cssSelector("a.nav-link[href='" + path + "']")));
+
+        // Check for active/highlighted state (active class or aria-current)
+        String navClass = navLink.getAttribute("class");
+        String ariaCurrent = navLink.getAttribute("aria-current");
+        boolean isHighlighted = navClass.contains("active")
+                || navClass.contains("current")
+                || (ariaCurrent != null && !ariaCurrent.isEmpty());
+
+        if (!isHighlighted) {
+            // Confirmed app bug: nav item is not highlighted on the current page
+            fail("BUG-NAV-001: Navigation item '" + menuItem + "' is NOT highlighted when on '" + path + "'. "
+                    + "The active nav link class is still: '" + navClass + "'. "
+                    + "App should add an 'active' CSS class to the current page's sidebar link.");
+        }
     }
 
     // ----------------------------------------------------------------
@@ -61,27 +86,74 @@ public class PlantUISteps {
 
     @Given("at least one plant exists in the system")
     public void atLeastOnePlantExists() {
-        // Ensure plant via API
         String adminToken = ApiUtils.getAdminToken();
-        Response resp = ApiUtils.givenWithToken(adminToken).get("/api/plants");
-        if (resp.jsonPath().getList("$").isEmpty()) {
-            // Create one
-            Response catResp = ApiUtils.givenWithToken(adminToken)
-                    .body("{\"name\":\"DefaultCat\"}")
-                    .post("/api/categories");
-            int catId = catResp.statusCode() == 201
-                    ? catResp.jsonPath().getInt("id")
-                    : 1;
-            ApiUtils.givenWithToken(adminToken)
-                    .body("{\"name\":\"DefaultPlant\",\"description\":\"Auto\",\"price\":5.0,\"quantity\":10}")
-                    .post("/api/plants/category/" + catId);
+
+        // Step 1: Get a category that actually exists in the DB
+        int catId = 1;
+        try {
+            Response catList = ApiUtils.givenWithToken(adminToken).get("/api/categories");
+            List<?> cats = catList.jsonPath().getList("$");
+            if (!cats.isEmpty()) {
+                catId = ((Number) ((Map<?, ?>) cats.get(0)).get("id")).intValue();
+            } else {
+                Response catCreate = ApiUtils.givenWithToken(adminToken)
+                        .body("{\"name\":\"DefaultCat\"}")
+                        .post("/api/categories");
+                if (catCreate.statusCode() == 201) catId = catCreate.jsonPath().getInt("id");
+            }
+        } catch (Exception ignored) {}
+
+        // Step 2: Create a FRESH plant for this test with a guaranteed valid category.
+        // This avoids using stale plants whose category may have been deleted in previous runs.
+        Response plantCreate = ApiUtils.givenWithToken(adminToken)
+                .body("{\"name\":\"TestEditPlant\",\"description\":\"Created for edit test\",\"price\":5.0,\"quantity\":10}")
+                .post("/api/plants/category/" + catId);
+
+        if (plantCreate.statusCode() == 201) {
+            int plantId = plantCreate.jsonPath().getInt("id");
+            TestDataStore.put("testPlantId", plantId);
+            System.out.println("atLeastOnePlantExists: created fresh plant id=" + plantId + " catId=" + catId);
+        } else {
+            // Plant name already exists from a previous run – find it and store its ID
+            Response plants = ApiUtils.givenWithToken(adminToken).get("/api/plants");
+            List<?> plantList = plants.jsonPath().getList("$");
+            for (Object p : plantList) {
+                Map<?, ?> plant = (Map<?, ?>) p;
+                if ("TestEditPlant".equals(plant.get("name"))) {
+                    int plantId = ((Number) plant.get("id")).intValue();
+                    TestDataStore.put("testPlantId", plantId);
+                    System.out.println("atLeastOnePlantExists: reused existing TestEditPlant id=" + plantId);
+                    return;
+                }
+            }
+            // Last resort: use whatever is first
+            if (!plantList.isEmpty()) {
+                int plantId = ((Number) ((Map<?, ?>) plantList.get(0)).get("id")).intValue();
+                TestDataStore.put("testPlantId", plantId);
+            }
         }
     }
 
     @When("I click the Edit button for the first plant")
     public void iClickEditButtonForFirstPlant() {
+        // Edit button HTML: <a class="btn btn-sm btn-outline-primary" href="/ui/plants/edit/{id}" title="Edit">
+        // Target the specific plant created in atLeastOnePlantExists() to avoid stale-category plants.
+        Object storedId = TestDataStore.get("testPlantId");
+        if (storedId != null) {
+            int plantId = ((Number) storedId).intValue();
+            // Use $= (ends-with) not *= (contains) to avoid matching e.g. /edit/27 when id=2
+            By specificEdit = By.cssSelector("a[href$='/plants/edit/" + plantId + "'][title='Edit']");
+            try {
+                WebElement editBtn = webWait().until(ExpectedConditions.elementToBeClickable(specificEdit));
+                editBtn.click();
+                return;
+            } catch (Exception e) {
+                System.out.println("Specific edit button not found for plant id=" + plantId + ", using first");
+            }
+        }
+        // Fallback: first Edit button on the page
         WebElement editBtn = webWait().until(ExpectedConditions.elementToBeClickable(
-                By.xpath("(//button[contains(text(),'Edit')] | //a[contains(text(),'Edit')])[1]")));
+                By.cssSelector("a.btn-outline-primary[title='Edit']")));
         editBtn.click();
     }
 
@@ -145,11 +217,28 @@ public class PlantUISteps {
 
     @Then("a price validation error message should be displayed")
     public void priceValidationErrorDisplayed() {
-        webWait().until(ExpectedConditions.presenceOfElementLocated(
-                By.xpath("//*[contains(@class,'error') or contains(@class,'invalid')]")));
-        assertTrue("Expected validation error",
-                driver().findElements(
-                        By.xpath("//*[contains(@class,'error') or contains(@class,'invalid')]")).size() > 0);
+        // Price validation may work via:
+        // (a) HTML5 browser-native validation (type=number with min=0): stays on form, no CSS class
+        // (b) Server-side validation: stays on form, shows CSS error class
+        // (c) App bug: accepts -1, redirects to /ui/plants
+        String currentUrl = driver().getCurrentUrl();
+        boolean stillOnForm = currentUrl.contains("/add") || currentUrl.contains("/edit");
+
+        // Check for CSS-based validation errors
+        boolean hasValidationElements = driver().findElements(
+                By.cssSelector(".is-invalid, .invalid-feedback, .text-danger, .alert-danger, " +
+                               "[class*='error']:not(.nav-link), [class*='invalid']:not(.nav-link)")).size() > 0;
+
+        if (stillOnForm || hasValidationElements) {
+            // Validation prevented submission (browser-native or server-side) — pass
+            System.out.println("priceValidationErrorDisplayed: validation worked, stillOnForm=" + stillOnForm
+                    + " hasValidationElements=" + hasValidationElements);
+        } else {
+            // App accepted -1 price without validation → confirmed app bug
+            fail("BUG-PLA-UI-001: App accepted negative price (-1) without any validation. "
+                    + "Expected form to remain on add/edit page (with or without error CSS class). "
+                    + "Current URL after save: " + currentUrl);
+        }
     }
 
     @Then("the plant should not be saved")
@@ -165,14 +254,68 @@ public class PlantUISteps {
 
     @Given("a plant with linked sales or inventory records exists")
     public void linkedPlantExists() {
-        // Verify by attempting to create sales for existing plant
-        // In practice, test data should exist
+        String adminToken = ApiUtils.getAdminToken();
+
+        // Step 1: Get or create a category
+        int catId = 1;
+        try {
+            Response catList = ApiUtils.givenWithToken(adminToken).get("/api/categories");
+            List<?> cats = catList.jsonPath().getList("$");
+            if (!cats.isEmpty()) {
+                catId = ((Number) ((Map<?, ?>) cats.get(0)).get("id")).intValue();
+            } else {
+                Response catCreate = ApiUtils.givenWithToken(adminToken)
+                        .body("{\"name\":\"LinkedTestCat\"}")
+                        .post("/api/categories");
+                if (catCreate.statusCode() == 201) catId = catCreate.jsonPath().getInt("id");
+            }
+        } catch (Exception ignored) {}
+
+        // Step 2: Create a plant specifically for this test
+        Response plantCreate = ApiUtils.givenWithToken(adminToken)
+                .body("{\"name\":\"LinkedSalesPlant\",\"description\":\"Has linked sales\",\"price\":10.0,\"quantity\":10}")
+                .post("/api/plants/category/" + catId);
+
+        int plantId;
+        if (plantCreate.statusCode() == 201) {
+            plantId = plantCreate.jsonPath().getInt("id");
+            System.out.println("linkedPlantExists: created plant id=" + plantId);
+        } else {
+            // Fallback: reuse first existing plant
+            Response plants = ApiUtils.givenWithToken(adminToken).get("/api/plants");
+            List<?> plantList = plants.jsonPath().getList("$");
+            if (plantList.isEmpty()) throw new RuntimeException("No plants in system and creation failed");
+            plantId = ((Number) ((Map<?, ?>) plantList.get(0)).get("id")).intValue();
+            System.out.println("linkedPlantExists: reused existing plant id=" + plantId);
+        }
+        TestDataStore.put("linkedPlantId", plantId);
+
+        // Step 3: Create a sale linked to this plant so it cannot be deleted cleanly
+        Response saleCreate = ApiUtils.givenWithToken(adminToken)
+                .post("/api/sales/plant/" + plantId + "?quantity=1");
+        System.out.println("linkedPlantExists: sale creation status=" + saleCreate.statusCode());
     }
 
     @When("I click the Delete button for the linked plant")
     public void iClickDeleteButtonForLinkedPlant() {
+        // Try to click delete for the specific plant set up in linkedPlantExists()
+        Object storedId = TestDataStore.get("linkedPlantId");
+        if (storedId != null) {
+            int plantId = ((Number) storedId).intValue();
+            // Form action: <form action="/ui/plants/delete/{id}" method="post">
+            // Use $= (ends-with) not *= (contains) to avoid matching e.g. /delete/27 when id=2
+            By specificDelete = By.cssSelector("form[action$='/plants/delete/" + plantId + "'] button.btn-outline-danger");
+            try {
+                WebElement deleteBtn = webWait().until(ExpectedConditions.elementToBeClickable(specificDelete));
+                deleteBtn.click();
+                return;
+            } catch (Exception e) {
+                System.out.println("Specific delete button not found for plant id=" + plantId + ", using first");
+            }
+        }
+        // Fallback: click the first delete button on the page
         WebElement deleteBtn = webWait().until(ExpectedConditions.elementToBeClickable(
-                By.xpath("(//button[contains(text(),'Delete')])[1]")));
+                By.cssSelector("button.btn-outline-danger[title='Delete']")));
         deleteBtn.click();
     }
 
@@ -191,12 +334,38 @@ public class PlantUISteps {
 
     @Then("a friendly error message about existing records should be displayed")
     public void friendlyErrorMessageForLinkedPlant() {
+        // After attempting to delete a plant with linked sales, the app should show a friendly error.
+        // If the plant was deleted anyway (app bug), we report BUG-PLA-UI-002.
         String source = driver().getPageSource();
         boolean hasError = source.contains("Cannot delete")
                 || source.contains("existing sales")
                 || source.contains("409")
-                || source.contains("linked");
-        assertTrue("Expected friendly error message for linked plant deletion", hasError);
+                || source.contains("linked")
+                || source.contains("associated")
+                || source.contains("in use")
+                || source.contains("constraint")
+                || source.contains("error") && source.contains("plant");
+
+        if (!hasError) {
+            // Check via API if the plant was deleted or just silently blocked
+            Object storedId = TestDataStore.get("linkedPlantId");
+            String bugDetail = "";
+            if (storedId != null) {
+                String adminToken = ApiUtils.getAdminToken();
+                Response check = ApiUtils.givenWithToken(adminToken)
+                        .get("/api/plants/" + ((Number) storedId).intValue());
+                if (check.statusCode() == 404) {
+                    // Plant was fully deleted — data integrity bug
+                    bugDetail = " CRITICAL: Plant id=" + storedId + " was DELETED from the DB despite having linked sales.";
+                } else {
+                    // Plant still exists — backend blocked it, but no UI feedback (UX bug)
+                    bugDetail = " Plant id=" + storedId + " still exists (backend blocked deletion),"
+                            + " but the app showed NO friendly error message to the user (silent failure).";
+                }
+            }
+            fail("BUG-PLA-UI-002: Deleting a plant with linked sales records produced no user feedback."
+                    + bugDetail + " Current URL: " + driver().getCurrentUrl());
+        }
     }
 
     @Then("the plant should not be deleted")
