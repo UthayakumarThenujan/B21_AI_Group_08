@@ -79,16 +79,27 @@ Feature: Sales Management UI Tests
     And no sales record should be created
 
   # ------------------------------------------------------------------
-  # TC_SAL_UI_06
+  # TC_SAL_UI_06 – User can sort by ALL sortable columns
+  # SRS: Sorting supported on Plant, Quantity, Total Price, Sold At
+  # Default sorting: Sold At (descending)
+  # Single Scenario Outline covers all 4 columns in one common block
   # ------------------------------------------------------------------
   @TC_SAL_UI_06
-  Scenario: TC_SAL_UI_06 – User can sort sales records using column headers
+  Scenario Outline: TC_SAL_UI_06 – User can sort sales records by <column> column
     Given I am logged in as User
     And multiple sales records exist in the system
     When I navigate to "/ui/sales"
-    And I click the "Total Price" column header
-    Then the sales records should be sorted correctly
-    And the sorting order should change when the column is clicked again
+    And I click the "<column>" column header to sort
+    Then the sales list should be sorted by "<column>" in ascending or descending order
+    When I click the "<column>" column header to sort again
+    Then the sort order for "<column>" should be reversed
+
+    Examples:
+      | column      |
+      | Plant       |
+      | Quantity    |
+      | Total Price |
+      | Sold At     |
 
   # ------------------------------------------------------------------
   # TC_SAL_UI_07
@@ -127,7 +138,7 @@ Feature: Sales Management UI Tests
   # ------------------------------------------------------------------
   @TC_SAL_UI_10
   Scenario: TC_SAL_UI_10 – No sales found message displayed when no sales records exist
-    Given I am logged in as User
+    Given I am logged in as Admin
     And no sales records exist in the system
     When I navigate to "/ui/sales"
     Then the message "No sales found" should be displayed
