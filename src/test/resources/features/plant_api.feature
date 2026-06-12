@@ -18,23 +18,25 @@ Feature: Plant Management API Tests
 
   # ------------------------------------------------------------------
   # TC_PLA_API_02
+  # SRS: Price must be greater than 0
   # ------------------------------------------------------------------
   @TC_PLA_API_02
-  Scenario: TC_PLA_API_02 – Admin can create a new plant via API
+  Scenario: TC_PLA_API_02 – Validation error when price is zero
+
     Given I have a valid Admin JWT token
-    And a category exists with name "PlantCategory"
+    And a category exists with name "PlantPriceCat"
+
     When I send a POST request to "/api/plants/category/{createdCategoryId}" with body:
       """
       {
-        "name": "Rose",
-        "description": "A beautiful flower",
-        "price": 10.50,
-        "quantity": 100
+        "name": "RosePlant",
+        "description": "Invalid price",
+        "price": 0,
+        "quantity": 10
       }
       """
-    Then the response status should be 201
-    And the response body should contain "Rose"
-    And I save the created plant ID as "createdPlantId"
+
+    Then the response status should be 400
 
   # ------------------------------------------------------------------
   # TC_PLA_API_03

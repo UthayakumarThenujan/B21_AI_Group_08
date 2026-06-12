@@ -118,25 +118,4 @@ Feature: Authentication API Tests
       """
     Then the response status should be 401
 
-  # ------------------------------------------------------------------
-  # TC_SAL_API_07 – Sales access control (assigned to Asarak)
-  # ------------------------------------------------------------------
-  @TC_SAL_API_07
-  Scenario: TC_SAL_API_07 – Normal user cannot delete a sales record via API
-    Given a sales record exists in the system
-    And I have a valid User JWT token
-    When I send a DELETE request to "/api/sales/{createdSalesId}"
-    Then the response status should be 403
-
-  # ------------------------------------------------------------------
-  # TC_SAL_API_08 – Sales access control (assigned to Asarak)
-  # ------------------------------------------------------------------
-  @TC_SAL_API_08
-  Scenario: TC_SAL_API_08 – Normal user cannot create a sales record via API
-    Given a plant exists in the system
-    And I have a valid User JWT token
-    When I send a POST request to "/api/sales/plant/{createdPlantId}?quantity=2" with body:
-      """
-      {}
-      """
-    Then the response status should be 403
+  

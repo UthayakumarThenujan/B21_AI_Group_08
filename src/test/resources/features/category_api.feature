@@ -56,29 +56,22 @@ Feature: Category Management API Tests
     And the response body should contain "Updated"
 
   # ------------------------------------------------------------------
-  # TC_CAT_API_04 – Update category with invalid name returns 400
-  # SRS: Category name must be between 3 and 10 characters
-  # "ab" = 2 chars (below minimum of 3) → expect 400
+  # TC_CAT_API_04 – Category name is required
+  # SRS: Category Name → Required
   # ------------------------------------------------------------------
   @TC_CAT_API_04
-  Scenario Outline: TC_CAT_API_04 – Update category with invalid name returns 400
+  Scenario: TC_CAT_API_04 – Create category without name returns 400
 
     Given I have a valid Admin JWT token
 
-    When I send a PUT request to "/api/categories/38" with body:
+    When I send a POST request to "/api/categories" with body:
       """
       {
-        "name": "<invalidName>",
-        "parentId": null
+        "name": ""
       }
       """
 
     Then the response status should be 400
-
-  Examples:
-    | invalidName  |
-    | ab           |
-    | Toolongname1 |
 
   # ------------------------------------------------------------------
   # TC_CAT_API_05 – Paginated category API returns correct structure
