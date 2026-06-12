@@ -631,7 +631,8 @@ public class SalesUISteps {
 
         String adminToken = ApiUtils.getAdminToken();
 
-        List<Map<String, Object>> sales = (List<Map<String, Object>>) TestDataStore.get("backupSales");
+        List<Map<String, Object>> sales =
+                (List<Map<String, Object>>) TestDataStore.get("backupSales");
 
         if (sales == null || sales.isEmpty()) {
             return;
@@ -641,9 +642,19 @@ public class SalesUISteps {
 
         for (Map<String, Object> sale : sales) {
 
-            Response restoreResponse = ApiUtils.givenWithToken(adminToken)
-                    .body(sale)
-                    .post("/api/sales");
+            Map<String, Object> plant =
+                    (Map<String, Object>) sale.get("plant");
+
+            Integer plantId =
+                    ((Number) plant.get("id")).intValue();
+
+            Integer quantity =
+                    ((Number) sale.get("quantity")).intValue();
+
+            Response restoreResponse =
+                    ApiUtils.givenWithToken(adminToken)
+                            .queryParam("quantity", quantity)
+                            .post("/api/sales/plant/" + plantId);
 
             System.out.println(
                     "Restore Sale -> HTTP "
