@@ -107,6 +107,9 @@ public class CategoryUISteps {
     @When("I click the {string} column header")
     public void iClickColumnHeader(String columnName) {
 
+        // Store the column name so SalesUISteps re-sort step can retrieve it
+        com.itqa.utils.TestDataStore.put("lastSortedColumn", columnName);
+
         By locator = By.xpath(
             "//th[normalize-space(text())='" + columnName + "']" +
             " | //th//*[contains(text(),'" + columnName + "')]"
