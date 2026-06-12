@@ -6,8 +6,9 @@ import io.restassured.response.Response;
 
 import java.util.List;
 import java.util.Map;
-
+import io.cucumber.java.After;
 import static org.junit.Assert.*;
+import com.itqa.utils.ApiUtils;
 
 /**
  * Step definitions for Sales Management API test cases.
@@ -19,32 +20,224 @@ import static org.junit.Assert.*;
 public class SalesAPISteps {
 
     // TC_SAL_API_04 sort assertion
-    @Then("the sales records should be sorted by quantity in descending order")
-    public void salesSortedByQuantityDesc() {
-        Response resp = TestDataStore.get("lastResponse");
-        List<Map<String, Object>> records = null;
+    @Then("the sales records should be sorted by {string} in {string} order")
+    public void salesRecordsShouldBeSorted(String field, String direction) {
 
-        try {
-            records = resp.jsonPath().getList("content");
-        } catch (Exception ignored) {}
+        Response response = TestDataStore.get("lastResponse");
 
-        if (records == null) {
-            try {
-                records = resp.jsonPath().getList("$");
-            } catch (Exception ignored) {}
+        List<Map<String, Object>> sales =
+                response.jsonPath().getList("$");
+
+        assertNotNull("Response should contain sales records", sales);
+
+        boolean descending =
+                direction.equalsIgnoreCase("desc");
+
+        for (int i = 0; i < sales.size() - 1; i++) {
+
+            Comparable current;
+            Comparable next;
+
+            switch (field) {
+
+                case "quantity":
+                    current = ((Number) sales.get(i)
+                            .get("quantity")).doubleValue();
+
+                    next = ((Number) sales.get(i + 1)
+                            .get("quantity")).doubleValue();
+                    break;
+
+                case "totalPrice":
+                    current = ((Number) sales.get(i)
+                            .get("totalPrice")).doubleValue();
+
+                    next = ((Number) sales.get(i + 1)
+                            .get("totalPrice")).doubleValue();
+                    break;
+
+                case "soldAt":
+                    current = sales.get(i)
+                            .get("soldAt")
+                            .toString();
+
+                    next = sales.get(i + 1)
+                            .get("soldAt")
+                            .toString();
+                    break;
+
+                case "plant.name":
+
+                    Map<String, Object> plant1 =
+                            (Map<String, Object>) sales.get(i)
+                                    .get("plant");
+
+                    Map<String, Object> plant2 =
+                            (Map<String, Object>) sales.get(i + 1)
+                                    .get("plant");
+
+                    current = plant1.get("name")
+                            .toString()
+                            .toLowerCase();
+
+                    next = plant2.get("name")
+                            .toString()
+                            .toLowerCase();
+                    break;
+
+                default:
+                    fail("Unsupported sort field: " + field);
+                    return;
+            }
+
+            int comparison = current.compareTo(next);
+
+            if (descending) {
+                assertTrue(
+                        "Expected descending order but found "
+                                + current + " before " + next,
+                        comparison >= 0);
+            } else {
+                assertTrue(
+                        "Expected ascending order but found "
+                                + current + " before " + next,
+                        comparison <= 0);
+            }
+        }
+    }
+
+    @When("I record the current stock of the plant")
+    public void recordCurrentStockOfPlant() {
+
+        Integer plantId =
+                TestDataStore.get("createdPlantId");
+
+        String adminToken =
+                ApiUtils.getAdminToken();
+
+        Response response =
+                ApiUtils.givenWithToken(adminToken)
+                        .get("/api/plants/" + plantId);
+
+        Integer stock =
+                response.jsonPath().getInt("quantity");
+
+        TestDataStore.put("stockBeforeSale", stock);
+
+        System.out.println(
+                "Plant ID: " + plantId +
+                ", Stock Before Sale: " + stock);
+    }
+
+    @Then("the plant stock should be reduced by {int}")
+    public void plantStockShouldBeReducedBy(int soldQty) {
+
+        Integer plantId =
+                TestDataStore.get("createdPlantId");
+
+        Integer stockBefore =
+                TestDataStore.get("stockBeforeSale");
+
+        String adminToken =
+                ApiUtils.getAdminToken();
+
+        Response response =
+                ApiUtils.givenWithToken(adminToken)
+                        .get("/api/plants/" + plantId);
+
+        Integer stockAfter =
+                response.jsonPath().getInt("quantity");
+
+        System.out.println(
+                "Stock Before: " + stockBefore +
+                ", Stock After: " + stockAfter);
+
+        assertEquals(
+                "Plant stock was not reduced correctly",
+                stockBefore - soldQty,
+                stockAfter.intValue()
+        );
+    }
+
+    @Given("a plant exists with at least {int} units in stock")
+    public void plantExistsWithStock(int requiredStock) {
+
+        String adminToken = ApiUtils.getAdminToken();
+
+        Response response =
+                ApiUtils.givenWithToken(adminToken)
+                        .get("/api/plants");
+
+        List<Map<String, Object>> plants =
+                response.jsonPath().getList("$");
+
+        for (Map<String, Object> plant : plants) {
+
+            Integer quantity =
+                    ((Number) plant.get("quantity")).intValue();
+
+            if (quantity >= requiredStock) {
+
+                Integer plantId =
+                        ((Number) plant.get("id")).intValue();
+
+                TestDataStore.put("createdPlantId", plantId);
+
+                System.out.println(
+                        "Using plant id=" + plantId +
+                        " stock=" + quantity);
+
+                return;
+            }
         }
 
-        if (records == null || records.size() < 2) {
-            System.out.println("Not enough records to verify sort order");
+        fail("No plant found with stock >= " + requiredStock);
+    }
+
+
+    @After("@TC_SAL_API_03")
+    public void restoreDeletedSale() {
+
+        String adminToken = ApiUtils.getAdminToken();
+
+        Map<String, Object> sale =
+                (Map<String, Object>) TestDataStore.get("deletedSaleBackup");
+
+        if (sale == null) {
             return;
         }
 
-        for (int i = 0; i < records.size() - 1; i++) {
-            Object q1 = records.get(i).get("quantity");
-            Object q2 = records.get(i + 1).get("quantity");
-            int qty1 = q1 instanceof Number ? ((Number) q1).intValue() : 0;
-            int qty2 = q2 instanceof Number ? ((Number) q2).intValue() : 0;
-            assertTrue("Expected descending sort at index " + i + ": " + qty1 + " >= " + qty2, qty1 >= qty2);
-        }
+        Map<String, Object> plant =
+                (Map<String, Object>) sale.get("plant");
+
+        Integer plantId =
+                ((Number) plant.get("id")).intValue();
+
+        Integer quantity =
+                ((Number) sale.get("quantity")).intValue();
+
+        Response restoreResponse =
+                ApiUtils.givenWithToken(adminToken)
+                        .post("/api/sales/plant/"
+                                + plantId
+                                + "?quantity="
+                                + quantity);
+
+        System.out.println(
+                "Restore Sale -> HTTP "
+                        + restoreResponse.statusCode());
+    }
+
+    @After("@TC_SAL_API_09")
+    public void restoreUpdatedSale() {
+
+        Response verify =
+                ApiUtils.givenWithToken(ApiUtils.getAdminToken())
+                        .get("/api/sales/" +
+                                TestDataStore.get("createdSalesId"));
+
+        System.out.println(
+                "Post-test verification status: "
+                        + verify.statusCode());
     }
 }
