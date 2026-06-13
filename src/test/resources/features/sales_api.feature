@@ -79,7 +79,7 @@ Feature: Sales Management API Tests
   # ------------------------------------------------------------------
   @TC_SAL_API_07
   Scenario: TC_SAL_API_07 – Normal user cannot delete a sales record via API
-    Given a sales record exists in the system
+    Given a sales record exists in the system sales
     And I have a valid User JWT token
     When I send a DELETE request to "/api/sales/{createdSalesId}"
     Then the response status should be 403

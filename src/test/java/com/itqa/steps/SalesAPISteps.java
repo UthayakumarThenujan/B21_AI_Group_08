@@ -194,6 +194,34 @@ public class SalesAPISteps {
         fail("No plant found with stock >= " + requiredStock);
     }
 
+    @Given("a sales record exists in the system sales")
+    public void aSalesRecordExistsInSystem() {
+
+        String adminToken = ApiUtils.getAdminToken();
+
+        Response response =
+                ApiUtils.givenWithToken(adminToken)
+                        .get("/api/sales");
+
+        List<Map<String, Object>> sales =
+                response.jsonPath().getList("$");
+
+        assertNotNull(sales);
+        assertFalse("No sales records found", sales.isEmpty());
+
+        Map<String, Object> sale = sales.get(0);
+
+        TestDataStore.put("deletedSaleBackup", sale);
+
+        Integer saleId =
+                ((Number) sale.get("id")).intValue();
+
+        TestDataStore.put("createdSalesId", saleId);
+
+        System.out.println(
+                "Using existing sale ID = " + saleId);
+    }
+
 
     @After("@TC_SAL_API_03")
     public void restoreDeletedSale() {
@@ -226,6 +254,62 @@ public class SalesAPISteps {
         System.out.println(
                 "Restore Sale -> HTTP "
                         + restoreResponse.statusCode());
+    }
+
+    @After("@TC_SAL_API_07")
+    public void restoreSaleIfDeleted() {
+
+    Integer saleId =
+            TestDataStore.get("createdSalesId");
+
+    if (saleId == null) {
+        return;
+    }
+
+    String adminToken =
+            ApiUtils.getAdminToken();
+
+    Response verify =
+            ApiUtils.givenWithToken(adminToken)
+                    .get("/api/sales/" + saleId);
+
+    if (verify.statusCode() == 200) {
+
+        System.out.println(
+                "Sale still exists. No restore needed.");
+        return;
+    }
+
+    System.out.println(
+            "Sale missing. Restoring backup...");
+
+    Map<String, Object> sale =
+            (Map<String, Object>)
+                    TestDataStore.get("deletedSaleBackup");
+
+    if (sale == null) {
+        return;
+    }
+
+    Map<String, Object> plant =
+            (Map<String, Object>) sale.get("plant");
+
+    Integer plantId =
+            ((Number) plant.get("id")).intValue();
+
+    Integer quantity =
+            ((Number) sale.get("quantity")).intValue();
+
+    Response restoreResponse =
+            ApiUtils.givenWithToken(adminToken)
+                    .post("/api/sales/plant/"
+                            + plantId
+                            + "?quantity="
+                            + quantity);
+
+    System.out.println(
+            "Restore Sale -> HTTP "
+                    + restoreResponse.statusCode());
     }
 
     @After("@TC_SAL_API_09")
